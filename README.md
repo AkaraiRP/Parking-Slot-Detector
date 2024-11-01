@@ -30,7 +30,7 @@ python main.py video=<VideoCapture> mask=[Optional: MaskFile]
 
 ### Manual Masking
 You can manually define parking spots if a mask is not supplied or you need to add a new spot. To do this, simply left click on the 4 corners of the parking spot you want to define and press `Enter`.
-![Manual Masking Example](https://giphy.com/gifs/95eUbbkp9ejCFt1F9G)
+![Manual Masking Example](https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExbXB3bTRnN2syYW14eTJkYjFtZWM3Ymp2bGUyZ2h5azZiNGM1YnVuNiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/95eUbbkp9ejCFt1F9G/giphy.webp)
 
 Additionally, if you want to remove a masked slot, simply press `Backspace` to delete the most recent slot. If using a mask file, the most recent slot may not be what you expect as it uses OpenCV's component mask to get the parking spots.
 
