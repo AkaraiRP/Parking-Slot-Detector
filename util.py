@@ -9,7 +9,9 @@ MODEL = pickle.load(open("model/model.p", "rb"))
 class NoSourceFound(Exception):
     pass
 
+
 def empty_or_not(spot_bgr):
+    # Basic model interaction, crops the spot and the model predicts if empty or not.
     flat_data = []
 
     img_resized = resize(spot_bgr, (15, 15, 3))
@@ -25,6 +27,7 @@ def empty_or_not(spot_bgr):
     
 
 def get_spot_from_points(points) -> list:
+    # Gets the coords of the 4 mouse clicks and transforms it into a rectangle.
     x = []
     y = []
 
@@ -32,16 +35,16 @@ def get_spot_from_points(points) -> list:
         x.append(points[i][0])
         y.append(points[i][1])
 
-    x1 = min(x)
-    y1 = min(y)
-    w = max(x) - x1
-    h = max(y) - y1
+    x1 = min(x)         # Left
+    y1 = min(y)         # Top
+    w = max(x) - x1     # Right
+    h = max(y) - y1     # Bottom
 
     return [x1, y1, w, h]
 
 
-
 def get_parking_spots_bboxes(connected_components):
+    # Uses cv2 connected components to get the spot.
     (totalLabels, label_ids, values, centroid) = connected_components
 
     slots = []

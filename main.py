@@ -10,6 +10,8 @@ THICKNESS_SCALE = 3e-3  # Adjust for larger thickness in all images
 class ParkingLotDetection:
     def __init__(self, cap, mask=None):
         self.cap = cap
+
+        # If mask file is unavailable, start with nothing for manual masking.
         if mask is not None:
             self.connected_components = cv2.connectedComponentsWithStats(mask, 4, cv2.CV_32S)
             self.spots = get_parking_spots_bboxes(self.connected_components)
@@ -41,12 +43,12 @@ class ParkingLotDetection:
         self.new_spot = None
         self.counter = 0
 
-        
-
     def calc_diff(self, im1, im2):
         return np.abs(np.mean(im1) - np.mean(im2))
 
     def get_diffs(self, frame, previous_frame):
+        # Basically, it gets the total pixel value of the spot, if the value passes a certain threshold,
+        # that means, there's a drastic change in the slot, and not just because of daylight cycle (car for example).
         for spot_indx, spot in enumerate(self.spots):
             x1, y1, w, h = spot
 
@@ -54,7 +56,7 @@ class ParkingLotDetection:
 
             self.diffs[spot_indx] = self.calc_diff(spot_crop, previous_frame[y1:y1 + h, x1:x1 + w, :])
         # print([self.diffs[j] for j in np.argsort(self.diffs)][::-1])
-        
+        # uncomment above to check for diffs
 
     def update_spots(self, frame, previous_frame):
         if previous_frame is None:
@@ -82,17 +84,24 @@ class ParkingLotDetection:
             self.counter = 0
 
     def removeLastPoint(self):
+        # Deletes whole spots
         if self.counter == 0:
             del self.spots[-1]
             del self.diffs[-1]
             del self.spots_status[-1]
             
+        # I CANNOT make this work and I did not have enough time to figure it out.
+        # This tries to delete the "confirmation rectangle" after drawing 4 points,
+        # I don't know why this doesn't work, but it's exactly the same code snippet as just left clicking after 4 counts.
+        # If someone can explain to me why this doesn't work, I'd be grateful.
         elif self.counter == 4:
             for x in range(0, 4):
                 self.circles[x] = 0, 0
             self.new_spot = None
             self.counter = 0
 
+        # Ugly implementation of getting the last "non-zero-zero (0, 0)" value in the numpy array and sets it to 0, 0.
+        # I think numpy has a way to do this, but this works and also fills the criteria.
         else:
             last = None
             for x in range(0, 4):
@@ -109,7 +118,6 @@ class ParkingLotDetection:
                 self.circles[last] = 0, 0
                 if self.counter > 0:
                     self.counter -= 1
-                
 
     def run(self):
         ret = True
@@ -120,7 +128,8 @@ class ParkingLotDetection:
         while ret:
             ret, frame = self.cap.read()
             
-
+            # If we have 4 mouse clicks, arrange the click to form a rectangle via contour.
+            # Contour draws in clockwise motion so it is necessary to arrange the coords before drawing.
             if self.counter == 4:
                 self.new_spot = get_spot_from_points(self.circles)
                 x1, y1, w, h = self.new_spot
@@ -128,6 +137,9 @@ class ParkingLotDetection:
 
                 frame = cv2.drawContours(frame, [points], 0, (255, 0, 0), 2)
 
+            # If the click counter hasn't reached 4, draw a circle on the cursor position.
+            # Additionally, the if statement makes sure that it only draws the circle if the coords aren't 0, 0
+            # because numpy arrays can't be empty, they're 0 by default, 0, 0 is the top left most corner of the screen.
             elif self.counter != 4:
                 for x in range(0, 4):
                     if self.circles[x][0] != 0 and self.circles[x][1] != 0:
@@ -141,7 +153,7 @@ class ParkingLotDetection:
                 try:
                     previous_frame = frame.copy()
                 except AttributeError:
-                    raise NoSourceFound
+                    raise NoSourceFound # If VideoCapture is corrupted or invalid, throws AttrErr
                 
 
             for spot_indx, spot in enumerate(self.spots):
@@ -151,28 +163,25 @@ class ParkingLotDetection:
                 points = np.array([[x1, y1], [x1 + w, y1], [x1 + w, y1 + h], [x1, y1 + h]])
 
                 if spot_status:
-                    # frame = cv2.rectangle(frame, (x1, y1), (x1 + w, y1 + h), (0, 255, 0), 2)
                     frame = cv2.drawContours(frame, [points], 0, (0, 255, 0), 2)
                 else:
-                    # frame = cv2.rectangle(frame, (x1, y1), (x1 + w, y1 + h), (0, 0, 255), 2)
                     frame = cv2.drawContours(frame, [points], 0, (0, 0, 255), 2)
-                # frame = cv2.circle(frame, (x1, y1), 3, (255, 0, 0), cv2.FILLED)
 
             
-            height, width, _ = frame.shape
+            height, width, _ = frame.shape # Get screen size for font calculation
 
             font_scale = min(width, height) * FONT_SCALE
             thickness = int(np.ceil(min(width, height) * THICKNESS_SCALE))
 
             cv2.putText(frame, 'Available spots: {} / {}'.format(str(sum(self.spots_status)), str(len(self.spots_status))), (18, 18),
-                cv2.FONT_HERSHEY_SIMPLEX, color=(0, 0, 0), thickness=thickness, fontScale=font_scale)
+                cv2.FONT_HERSHEY_SIMPLEX, color=(0, 0, 0), thickness=thickness, fontScale=font_scale) # Text Shadow
             cv2.putText(frame, 'Available spots: {} / {}'.format(str(sum(self.spots_status)), str(len(self.spots_status))), (20, 20),
-                cv2.FONT_HERSHEY_SIMPLEX, color=(255, 255, 255), thickness=thickness, fontScale=font_scale)
+                cv2.FONT_HERSHEY_SIMPLEX, color=(255, 255, 255), thickness=thickness, fontScale=font_scale) # Actual Text
             
 
             cv2.namedWindow('Parking', cv2.WINDOW_NORMAL)
             cv2.imshow('Parking', frame)
-            cv2.setMouseCallback('Parking', self.mousePoints)
+            cv2.setMouseCallback('Parking', self.mousePoints) # Required to make mouseclicks work.
             
             keypress = cv2.waitKey(25) & 0xFF
 
@@ -180,10 +189,12 @@ class ParkingLotDetection:
                 print("Exited with key 'q'")
                 break
 
+            # 13 is Enter
             if keypress == 13 and self.counter == 4 and self.new_spot is not None and previous_frame is not None:
                 self.spots.append(self.new_spot)
                 self.extend_slots(frame, previous_frame)
 
+            # 8 is Backspace
             if keypress == 8 and self.counter < 4 and previous_frame is not None:
                 self.removeLastPoint()
 
@@ -198,7 +209,7 @@ def main(argv):
 
     video = cv2.VideoCapture('data/parking_sample_loop.mp4')
     # mask = cv2.imread('data/mask_sample.png', 0)
-    mask = None
+    mask = None # Default mask to None instead of using the sample mask.
 
     try:
         opts, args = getopt.getopt(argv,"hv:m:",["video=","mask="])
