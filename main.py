@@ -1,6 +1,7 @@
 import sys, getopt
 import cv2
 import numpy as np
+import datetime
 
 from util import get_parking_spots_bboxes, empty_or_not, get_spot_from_points, NoSourceFound
 
@@ -83,6 +84,17 @@ class ParkingLotDetection:
             self.new_spot = None
             self.counter = 0
 
+    def save_mask(self, mask):
+        try:
+            date = datetime.datetime.now()
+            fname = f"saved_mask-{date.strftime('%Y-%m-%d')}"
+            path = f'data/{fname}.png'
+
+            cv2.imwrite(path, mask)
+            print("Save complete!")
+        except Exception as e:
+            raise e
+
     def removeLastPoint(self):
         # Deletes whole spots
         if self.counter == 0:
@@ -156,6 +168,10 @@ class ParkingLotDetection:
                     raise NoSourceFound # If VideoCapture is corrupted or invalid, throws AttrErr
                 
 
+            mask = np.zeros(frame.shape, dtype=np.uint8)
+            cv2.rectangle(mask, (0, 0), (frame.shape[1], frame.shape[0]),
+                          (0, 0, 0), thickness=cv2.FILLED)
+
             for spot_indx, spot in enumerate(self.spots):
                 spot_status = self.spots_status[spot_indx]
 
@@ -167,6 +183,7 @@ class ParkingLotDetection:
                 else:
                     frame = cv2.drawContours(frame, [points], 0, (0, 0, 255), 2)
 
+                cv2.rectangle(mask, (x1, y1), (x1 + w, y1 + h), (255, 255, 255), thickness=cv2.FILLED)
             
             height, width, _ = frame.shape # Get screen size for font calculation
 
@@ -177,7 +194,6 @@ class ParkingLotDetection:
                 cv2.FONT_HERSHEY_SIMPLEX, color=(0, 0, 0), thickness=thickness, fontScale=font_scale) # Text Shadow
             cv2.putText(frame, 'Available spots: {} / {}'.format(str(sum(self.spots_status)), str(len(self.spots_status))), (20, 20),
                 cv2.FONT_HERSHEY_SIMPLEX, color=(255, 255, 255), thickness=thickness, fontScale=font_scale) # Actual Text
-            
 
             cv2.namedWindow('Parking', cv2.WINDOW_NORMAL)
             cv2.imshow('Parking', frame)
@@ -188,6 +204,10 @@ class ParkingLotDetection:
             if keypress == ord('q'):
                 print("Exited with key 'q'")
                 break
+
+            if keypress == ord('s'):
+                print("Saving mask...")
+                self.save_mask(mask)
 
             # 13 is Enter
             if keypress == 13 and self.counter == 4 and self.new_spot is not None and previous_frame is not None:
